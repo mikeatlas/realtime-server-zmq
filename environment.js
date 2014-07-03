@@ -59,7 +59,7 @@ module.exports = {
 			sessionData = msg.session_data;
 			sessionExpiration = msg.expiration;
 			sessionKey = "rtSession-" + userId + "-" + sessionId;			
-			cache.put(sessionKey, sessionData);
+			cache.put(sessionKey, sessionData, sessionExpiration);
 			session = cache.get(sessionKey);
 		});
 		zmqSubscriberSessionStore.connect("tcp://localhost:5557");
