@@ -5,6 +5,7 @@
     "dependencies": {
         "socket.io": "1.0.x",
         "zmq": "2.7.x",
+        "memory-cache": "0.0.x",
         "underscore": "1.5.2",
         "cookie": "0.1.x",
         "sentry-node": "0.2.x",

@@ -1,7 +1,6 @@
 var environment = require('./environment.js');
 
-var redis = environment.loadRedis();
 var zmq = environment.loadZmq();
-var io = environment.loadSocketIo(redis);
+var io = environment.loadSocketIo();
 
-environment.authorize(io, redis);
+environment.authorize(io);

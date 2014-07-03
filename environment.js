@@ -9,7 +9,6 @@ module.exports = {
 		zmqPuller = zmq.socket('pull');
 		zmqPub = zmq.socket('pub');
 
-
 		zmqPuller.on('message', function(message) {
 		    console.log('zmq message received: ' + message);
 
@@ -40,14 +39,30 @@ module.exports = {
 		};
 	},
     
-    loadSocketIo: function loadSocketIo(redis) {
+    loadSocketIo: function loadSocketIo() {
 
         var port = process.env.PORT || 5001;
         if (process.env.NODE_ENV != 'production') {
             port = 5001; // run on a different port when in non-production mode.
         }
 
-        console.log('STARTING ON PORT: ' + port);
+		var zmq = require('zmq');
+
+		var zmqSubscriberSessionStore = zmq.socket('sub');
+		zmqSubscriberSessionStore.subscribe('rtSession');
+		zmqSubscriberSessionStore.on('message', function(message) {
+			actualMessage = message.toString().split('rtSession:')[1]
+			msg = JSON.parse(actualMessage);
+			var cache = require('memory-cache');			
+			userId = msg.user_id;
+			sessionId = msg.session_id;
+			sessionData = msg.session_data;
+			sessionExpiration = msg.expiration;
+			sessionKey = "rtSession-" + userId + "-" + sessionId;			
+			cache.put(sessionKey, sessionData);
+			session = cache.get(sessionKey);
+		});
+		zmqSubscriberSessionStore.connect("tcp://localhost:5557");
 
         var io = require('socket.io').listen(Number(port));
 
@@ -57,12 +72,9 @@ module.exports = {
                 console.log('Realtime User ID connected: ' + message.userId);
             });
 
-
-			zmq = require('zmq');
-
-			zmqSub = zmq.socket('sub');
-			zmqSub.subscribe('realtime_msg');
-			zmqSub.on('message', function(message) {
+			var zmqSubscriberRealtimeMessage = zmq.socket('sub');
+			zmqSubscriberRealtimeMessage.subscribe('realtime_msg');
+			zmqSubscriberRealtimeMessage.on('message', function(message) {
 			    console.log('Subscriber (node.js) message received: ' + message);
 			   	actualMessage = message.toString().split('realtime_msg:')[1]
 			 
@@ -87,14 +99,14 @@ module.exports = {
                 }
 			});
 
-			zmqSub.connect("tcp://localhost:5557");
+			zmqSubscriberRealtimeMessage.connect("tcp://localhost:5557");
 
         });
 
         return io;
     },
 
-    authorize: function authorize(io, redis) {
+    authorize: function authorize(io) {
         io.use(function(socket, next) {
            
             var sessionId = null;
@@ -116,43 +128,18 @@ module.exports = {
 
             sessionId = params["_rtToken"];
             userId = params["_rtUserId"];
- 
-            // retrieve session from redis using the unique key stored in cookies
-            redis.getSet.hget([("rtSession-" + userId), sessionId], 
-                function(err, session) {
-                    if (err || !session) {
-                        next(new Error('Unauthorized Realtime user (session)'));
-                    } else {
-                        socket.request.session = JSON.parse(session);
-                        next()
-                    }
-                }
-            );
-            
+
+            var cache = require('memory-cache');
+            sessionKey = "rtSession-" + userId + "-" + sessionId;
+            session = cache.get(sessionKey);
+
+            if (session != null){
+            	 socket.request.session = JSON.parse(session);
+                 next()
+            }
+            else {
+            	next(new Error('Unauthorized Realtime user (session)'));
+            }    
         });
-    },
-
-    loadRedis: function loadRedis() {
-        var redis = require('redis');
-        var url = require('url');
-        var redisURL = url.parse("redis://127.0.0.1:6379/0");
-        var redisGetSet = null;
-        
-        if (process.env.REDISCLOUD_URL == null) {
-            // use local client if there's no redis cloud url set up.
-            redisGetSet = redis.createClient();
-        } else {
-            // use environment redis connection info.
-            redisURL = url.parse(process.env.REDISCLOUD_URL);
-            
-            redisGetSet = redis.createClient(redisURL.port, redisURL.hostname, {
-                no_ready_check: true
-            });
-            redisGetSet.auth(redisURL.auth.split(":")[1]);
-        }
-
-        return {
-            getSet: redisGetSet,
-        };
     },
 }
