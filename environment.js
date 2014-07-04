@@ -53,7 +53,8 @@ module.exports = {
 		zmqSubscriberSessionStore.on('message', function(message) {
 			actualMessage = message.toString().split('rtSession:')[1]
 			msg = JSON.parse(actualMessage);
-			var cache = require('memory-cache');			
+			var cache = require('memory-cache');
+			cache.debug(true);			
 			userId = msg.user_id;
 			sessionId = msg.session_id;
 			sessionData = msg.session_data;
@@ -130,6 +131,7 @@ module.exports = {
             userId = params["_rtUserId"];
 
             var cache = require('memory-cache');
+            cache.debug(true);
             sessionKey = "rtSession-" + userId + "-" + sessionId;
             session = cache.get(sessionKey);
 
